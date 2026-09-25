@@ -23,6 +23,10 @@ export default function Home() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.end_date < formData.start_date) {
+      alert("End date must be on or after the start date.");
+      return;
+    }
   
     try {
       const response = await fetch(
