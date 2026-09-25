@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Employee Time-Off Request Automation
 
-## Getting Started
+## Project Overview
 
-First, run the development server:
+This project is an automated Employee Time-Off Request system.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Employees submit a time-off request through a web form built with Next.js. The form sends the request to an n8n workflow through a webhook.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The n8n workflow validates the request, checks employee and department information, applies business rules, processes the decision, updates the leave balance when required, and sends an email notification.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Technologies Used
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js
+- React
+- TypeScript
+- n8n
+- n8n Data Tables
+- Webhooks
+- SMTP Email
+- Git
+- GitHub
 
-## Learn More
+## How the System Works
 
-To learn more about Next.js, take a look at the following resources:
+Employee Time-Off Form
+        ↓
+n8n Webhook
+        ↓
+Validate Request
+        ↓
+Find & Verify Employee
+        ↓
+Check Employee Status
+        ↓
+Check for Duplicate Requests
+        ↓
+Find Department
+        ↓
+Apply Policy Rules
+        ↓
+Emergency Request?
+        ↓
+Automatic Decision OR Human Review
+        ↓
+Prepare Final Record
+        ↓
+Save Final Decision
+        ↓
+Update Leave Balance if Required
+        ↓
+Send Final Decision Email
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Main Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. Employee Request Form
 
-## Deploy on Vercel
+The employee enters:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Employee ID
+- Department ID
+- Start Date
+- End Date
+- Request Type
+- Reason
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The frontend also checks that the end date is not before the start date.
+
+### 2. Webhook Integration
+
+The Next.js application sends the request to an n8n webhook using an HTTP POST request.
+
+### 3. Request Validation
+
+The workflow validates the submitted information before processing the request.
+
+Examples include:
+
+- Employee ID is required
+- Department ID is required
+- Dates must be valid
+- End date cannot be before the start date
+- Request type must be valid
+- Emergency requests require a reason
+
+### 4. Employee Verification
+
+The workflow checks employee information and determines whether the employee is eligible for further processing.
+
+### 5. Duplicate Detection
+
+The workflow checks existing requests to help prevent the same time-off request from being processed multiple times.
+
+### 6. Policy Rules
+
+Business rules are applied to determine whether the request can be processed automatically or requires additional review.
+
+### 7. Human Review
+
+Requests requiring manual review can be routed for an HR or manager decision.
+
+### 8. Leave Balance
+
+For applicable approved requests, the workflow updates the employee's leave balance.
+
+### 9. Email Notifications
+
+The system uses SMTP email nodes to send notifications such as:
+
+- Invalid request notification
+- Emergency approval email
+- Final decision email
+
+## Project Structure
+
+```text
+time-off-request-app/
+│
+├── app/
+│   ├── page.tsx
+│   ├── layout.tsx
+│   └── globals.css
+│
+├── n8n-workflow/
+│   └── Time-Off Request Workflow.json
+│
+├── public/
+├── package.json
+└── README.md
