@@ -30,7 +30,7 @@ export default function Home() {
   
     try {
       const response = await fetch(
-        "https://instance-already-faster-developing.trycloudflare.com/webhook/time-off-request",
+        "https://engaged-intersection-attachment-hostel.trycloudflare.com/webhook/time-off-request",
         {
           method: "POST",
           headers: {
