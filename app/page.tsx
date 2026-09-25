@@ -30,7 +30,7 @@ export default function Home() {
   
     try {
       const response = await fetch(
-        "http://localhost:5678/webhook-test/time-off-request",
+        "http://localhost:5678/webhook/time-off-request",
         {
           method: "POST",
           headers: {
