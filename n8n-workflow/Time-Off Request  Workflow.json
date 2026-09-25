@@ -1,0 +1,1376 @@
+{
+  "name": "Time-Off Request  Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Employee Time-Off Request",
+        "formDescription": "Submit a request for paid, unpaid, sick, or emergency leave.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Employee name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Employee ID",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Department ID",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Employee email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Start date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "End date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Request type",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Paid Time Off"
+                  },
+                  {
+                    "option": "Unpaid Time Off"
+                  },
+                  {
+                    "option": "Sick"
+                  },
+                  {
+                    "option": "Emergency"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Reason",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        0,
+        528
+      ],
+      "id": "7a70a5db-08bd-43b2-b025-13e6d9659a9c",
+      "name": "Time-Off Request Form",
+      "webhookId": "cea6a38d-7f7d-4e45-ba0b-34f297f68a41"
+    },
+    {
+      "parameters": {
+        "jsCode": "const x = $json.body ?? $json;\n\n// Support both n8n field labels and field names\nconst get = (name, label) => x[name] ?? x[label] ?? '';\nconst clean = (value) => String(value || '').trim();\n\nconst employeeId = clean(get('employee_id', 'Employee ID'));\nconst employeeName = clean(get('employee_name', 'Employee name'));\nconst employeeEmail = clean(get('employee_email', 'Employee email'));\nconst departmentId = clean(get('department_id', 'Department ID'));\nconst startDate = clean(get('start_date', 'Start date'));\nconst endDate = clean(get('end_date', 'End date'));\nconst requestType = clean(get('request_type', 'Request type'));\nconst reason = clean(get('reason', 'Reason'));\n\nconst now = new Date();\nconst start = new Date(`${startDate}T00:00:00Z`);\nconst end = new Date(`${endDate}T00:00:00Z`);\n\nconst requestedDays =\n  Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())\n    ? 0\n    : Math.floor((end - start) / 86400000) + 1;\n\nconst allowedTypes = [\n  'Paid Time Off',\n  'Unpaid Time Off',\n  'Sick',\n  'Emergency',\n];\n\nconst errors = [];\n\nif (!employeeId) errors.push('Employee ID is required');\nif (!departmentId) errors.push('Department ID is required');\nif (Number.isNaN(start.getTime())) errors.push('Start date is invalid');\n\nif (Number.isNaN(end.getTime()) || end < start) {\n  errors.push('End date must be on or after start date');\n}\n\nif (!allowedTypes.includes(requestType)) {\n  errors.push('Request type is invalid');\n}\n\nif (requestType === 'Emergency' && !reason) {\n  errors.push('Emergency requests require a reason');\n}\n\nreturn [\n  {\n    json: {\n      request_id:\n        `TOR-${now.toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}` +\n        `-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,\n\n      deduplication_key: [\n        employeeId,\n        startDate,\n        endDate,\n        requestType,\n      ].join('|'),\n\n      employee_id: employeeId,\n      employee_name: employeeName,\n      employee_email: employeeEmail,\n      department_id: departmentId,\n      start_date: startDate,\n      end_date: endDate,\n      request_type: requestType,\n      reason,\n      status: errors.length ? 'Invalid' : 'Submitted',\n      requested_days: requestedDays,\n      created_at: now.toISOString(),\n      decision_source: errors.length ? 'Validation' : 'Pending',\n      decision_reason: errors.join('; '),\n      n8n_execution_id: $execution.id,\n      decided_at: errors.length ? now.toISOString() : '',\n      valid_input: errors.length === 0,\n      request_date: now.toISOString(),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        528
+      ],
+      "id": "70a02bc1-64d5-429f-b1e7-27d69040d480",
+      "name": "Prepare & Validate Request"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "time off requests",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "request_id": "={{ $json.request_id }}",
+            "deduplication_key": "={{ $json.deduplication_key }}",
+            "employee_id": "={{ $json.employee_id }}",
+            "department_id": "={{ $json.department_id }}",
+            "start_date": "={{ $json.start_date }}",
+            "end_date": "={{ $json.end_date }}",
+            "request_type": "={{ $json.request_type }}",
+            "reason": "={{ $json.reason }}",
+            "status": "={{ $json.status }}",
+            "requested_days": "={{ $json.requested_days }}",
+            "created_at": "={{ $json.created_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "decision_reason": "={{ $json.decision_reason }}",
+            "n8n_execution_id": "={{ $json.n8n_execution_id }}",
+            "decided_at": "={{ $json.decided_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "deduplication_key",
+              "displayName": "deduplication_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "department_id",
+              "displayName": "department_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "request_type",
+              "displayName": "request_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requested_days",
+              "displayName": "requested_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "n8n_execution_id",
+              "displayName": "n8n_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        528
+      ],
+      "id": "6589b68a-5134-4855-aa31-651c81fd968f",
+      "name": "Log Submitted Request"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bdb4cf62-451e-419e-839c-86e605ee9f17",
+              "leftValue": "={{ $('Prepare & Validate Request').item.json.valid_input }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        528
+      ],
+      "id": "610968a2-f5f5-46fb-83f1-a6c624866ab5",
+      "name": "Valid Input?"
+    },
+    {
+      "parameters": {
+        "fromEmail": "Zena <zxa220012@utdallas.edu>",
+        "toEmail": "={{ $('Prepare & Validate Request').item.json.employee_email }}",
+        "subject": "Time-off request needs correction",
+        "html": "=<p>Hello {{ $('Prepare & Validate Request').item.json.employee_name }},</p><p>Your request could not be processed:</p><p><strong>{{ $('Prepare & Validate Request').item.json.decision_reason }}</strong></p><p>Please submit a corrected request.</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        896,
+        736
+      ],
+      "id": "cc8580ca-6f39-43bc-9864-906dbbad8817",
+      "name": "Email Invalid Request",
+      "webhookId": "e73ad9de-e44c-4a6b-8a8b-c440c77da389",
+      "credentials": {
+        "smtp": {
+          "id": "VpHGgWuXK2LlqL8v",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "employees",
+          "mode": "name"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "=employee_id",
+              "condition": "=eq",
+              "keyValue": "={{ $('Prepare & Validate Request').item.json.employee_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        912,
+        448
+      ],
+      "id": "f81158a6-40ab-4f31-97b4-b63ee44ac2e9",
+      "name": "Find Employee",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const req=$('Prepare & Validate Request').item.json; const e=$json; const ok=!!e.employee_id && String(e.active).toLowerCase()==='true' && String(e.department_id)===String(req.department_id); return [{json:{...req,employee_record:e,employee_ok:ok,manager_reason:!e.employee_id?'Employee not found':String(e.active).toLowerCase()!=='true'?'Employee is inactive':'Department does not match employee record'}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        448
+      ],
+      "id": "d8c2c8c9-597f-481a-9191-59458e0099ed",
+      "name": "Verify Employee"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3414e642-bb91-41f5-994f-6db8dd3ebceb",
+              "leftValue": "={{ $json.employee_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        448
+      ],
+      "id": "f5821ccc-482e-4977-9bab-4714fc659015",
+      "name": "Active Employee?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r=$json; return [{json:{...r,status:'HR Review',decision_source:'Employee validation',decision_reason:r.manager_reason,decided_at:new Date().toISOString()}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        688
+      ],
+      "id": "28a648b5-92b6-4ba1-8029-1002dfc64faa",
+      "name": "Set HR Review - Employee"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "time off requests",
+          "mode": "name"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "deduplication_key",
+              "condition": "=eq",
+              "keyValue": "={{ $('Prepare & Validate Request').item.json.deduplication_key }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        368
+      ],
+      "id": "ea1c8cc0-6484-453e-ab91-d0f1b42f02d9",
+      "name": "Find Same Requests",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $('Prepare & Validate Request').item.json;\n\n// Get all matching requests except the current request\nconst rows = $input.all()\n  .map(i => i.json)\n  .filter(r => r.request_id && r.request_id !== req.request_id);\n\n// If at least one previous matching request exists,\n// treat the new request as a duplicate\nconst duplicate = rows.length > 0;\n\nreturn [{\n  json: {\n    ...req,\n    employee_record: $('Verify Employee').item.json.employee_record,\n    duplicate: duplicate,\n    duplicate_count: rows.length\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        368
+      ],
+      "id": "c155344d-cf7a-4732-9c9f-f3bea3f6a8b7",
+      "name": "Evaluate Duplicate"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2172790d-f201-46b6-aa37-822027050201",
+              "leftValue": "={{ $json.duplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2032,
+        368
+      ],
+      "id": "c503ff87-f8c6-4a6f-bc7b-be68616aec4e",
+      "name": "Duplicate Request?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json,\n    status: 'Duplicate',\n    decision_source: 'Duplicate rule',\n    decision_reason: 'A previous request already has the same employee, dates, and request type.',\n    decided_at: new Date().toISOString()\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        608
+      ],
+      "id": "b556534f-6832-4169-ba84-763069a7df3b",
+      "name": "Set Duplicate"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "department",
+          "mode": "name"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "department_id",
+              "keyValue": "={{ $('Prepare & Validate Request').item.json.department_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2272,
+        288
+      ],
+      "id": "ec87e2f9-8bbf-49ba-a4c6-1021f5f80366",
+      "name": "Find Department",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "time off request",
+          "mode": "name"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "department_id",
+              "keyValue": "={{ $('Prepare & Validate Request').item.json.department_id }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        2480,
+        288
+      ],
+      "id": "6ab5ba60-8093-402a-a5a1-9c37d6c61b46",
+      "name": "Find Department Requests",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const req=$('Prepare & Validate Request').item.json; const emp=$('Verify Employee').item.json.employee_record; const dept=$('Find Department').item.json; const requests=$input.all().map(i=>i.json).filter(r=>r.request_id&&r.request_id!==req.request_id); const rs=new Date(req.start_date+'T00:00:00Z'); const re=new Date(req.end_date+'T00:00:00Z'); const notice=Math.floor((rs-new Date(req.request_date))/86400000); const overlapping=requests.filter(r=>r.status==='Approved' && new Date(r.start_date+'T00:00:00Z')<=re && new Date(r.end_date+'T00:00:00Z')>=rs).length; const total=Number(dept.total_employees||0); const pct=total?((overlapping+1)/total):1; const max=Number(dept.max_leave_percent||0.30); let status='Approved', reason='All automatic rules passed', source='Automatic rules'; if(req.request_type==='Emergency'){status='Emergency Review';reason='Emergency requests require a human decision';source='Human approval required';} else if(notice<14){status='Denied – Insufficient Notice';reason=`Submitted ${notice} days before start; 14 required`;source='Notice rule';} else if(['Paid Time Off','Sick'].includes(req.request_type) && Number(emp.leave_balance)<Number(req.requested_days)){status='Denied – Insufficient Balance';reason=`Balance ${emp.leave_balance}; requested ${req.requested_days}`;source='Balance rule';} else if(pct>max){status='HR Review';reason=`Projected department leave ${(pct*100).toFixed(1)}% exceeds ${(max*100).toFixed(0)}%`;source='Department availability rule';} return [{json:{...req,employee_record:emp,department_record:dept,notice_days:notice,overlapping_approved:overlapping,projected_leave_percent:pct,status,decision_reason:reason,decision_source:source,decided_at:status==='Emergency Review'?'':new Date().toISOString()}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2704,
+        288
+      ],
+      "id": "2b2dc3e6-34bf-4fda-a983-ce6fe9481917",
+      "name": "Apply Policy Rules"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c7a24751-11db-40cd-a388-019368eaf072",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Emergency Review",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2928,
+        288
+      ],
+      "id": "43b2dad6-ab97-4abd-82c7-f5ed98b6b7ce",
+      "name": "Emergency?"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "fromEmail": "Zena <zxa220012@utdallas.edu>",
+        "toEmail": "={{ $json.department_record.manager_email || 'hr@example.com' }}",
+        "subject": "=Emergency time-off approval: {{ $json.employee_name }}",
+        "message": "Emergenvy time off ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3152,
+        128
+      ],
+      "id": "a2ed408e-5a56-41f6-b218-9b134ba9c66f",
+      "name": "Emergency Approval Email",
+      "webhookId": "ac235afa-3063-4221-b0f6-f314a17c5f8e",
+      "credentials": {
+        "smtp": {
+          "id": "VpHGgWuXK2LlqL8v",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const req=$('Apply Policy Rules').item.json; const approved=$json.data?.approved === true || $json.approved === true; return [{json:{...req,status:approved?'Approved':'Denied',decision_source:'Human decision',decision_reason:approved?'Emergency request approved by manager/HR':'Emergency request declined by manager/HR',decided_at:new Date().toISOString()}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3360,
+        128
+      ],
+      "id": "f7214ba4-348a-411a-9d81-1e0adf240b25",
+      "name": "Record Human Decision"
+    },
+    {
+      "parameters": {
+        "jsCode": "const r=$json; const e=r.employee_record||{}; const deduct=r.status==='Approved' && ['Paid Time Off','Sick'].includes(r.request_type); return [{json:{request_id:r.request_id,deduplication_key:r.deduplication_key,employee_id:r.employee_id,department_id:r.department_id,start_date:r.start_date,end_date:r.end_date,request_type:r.request_type,reason:r.reason,status:r.status,requested_days:r.requested_days,created_at:r.created_at,decision_source:r.decision_source,decision_reason:r.decision_reason,n8n_execution_id:r.n8n_execution_id,decided_at:r.decided_at,employee_email: r.employee_email || e.email ||'',employee_name: r.employee_name || e.employee_name || '',new_leave_balance:deduct?Number(e.leave_balance)-Number(r.requested_days):Number(e.leave_balance),deduct_balance:deduct}}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3600,
+        368
+      ],
+      "id": "311d62a9-3f0c-4e3f-b921-a8473fa5438c",
+      "name": "Prepare Final Record"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "time off request",
+          "mode": "name"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "=eq",
+              "keyValue": "={{ $json.request_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "request_id": "={{ $json.request_id }}",
+            "deduplication_key": "={{ $json.deduplication_key }}",
+            "employee_id": "={{ $json.employee_id }}",
+            "department_id": "={{ $json.department_id }}",
+            "start_date": "={{ $json.start_date }}",
+            "end_date": "={{ $json.end_date }}",
+            "request_type": "={{ $json.request_type }}",
+            "reason": "={{ $json.reason }}",
+            "status": "={{ $json.status }}",
+            "requested_days": "={{ $json.requested_days }}",
+            "created_at": "={{ $json.created_at }}",
+            "decision_source": "={{ $json.decision_source }}",
+            "decision_reason": "={{ $json.decision_reason }}",
+            "n8n_execution_id": "={{ $json.n8n_execution_id }}",
+            "decided_at": "={{ $json.decided_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "request_id",
+              "displayName": "request_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "deduplication_key",
+              "displayName": "deduplication_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "department_id",
+              "displayName": "department_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "start_date",
+              "displayName": "start_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "end_date",
+              "displayName": "end_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "request_type",
+              "displayName": "request_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "requested_days",
+              "displayName": "requested_days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_source",
+              "displayName": "decision_source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decision_reason",
+              "displayName": "decision_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "n8n_execution_id",
+              "displayName": "n8n_execution_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "decided_at",
+              "displayName": "decided_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        3808,
+        368
+      ],
+      "id": "96a10bde-e893-4ccf-80f2-cb91dcffa3ed",
+      "name": "Save Final Decision"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "22252c26-cae1-46d2-a075-8f00cb0bc83d",
+              "leftValue": "={{ $('Prepare Final Record').item.json.deduct_balance }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4032,
+        368
+      ],
+      "id": "6813a0f2-387b-47a6-a30b-d5f445e6ad08",
+      "name": "Deduct Balance?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "value": "Ywu8TMgIq9jIG1sv",
+          "mode": "list",
+          "cachedResultName": "employees",
+          "cachedResultUrl": "/projects/aqt3O1bW3EHGYzr1/datatables/Ywu8TMgIq9jIG1sv"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "employee_id",
+              "condition": "=eq",
+              "keyValue": "={{ $('Prepare Final Record').item.json.employee_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "leave_balance": "={{ $('Prepare Final Record').item.json.new_leave_balance }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "employee_id",
+              "displayName": "employee_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "employee_name",
+              "displayName": "employee_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "department_id",
+              "displayName": "department_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "active",
+              "displayName": "active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": true
+            },
+            {
+              "id": "leave_balance",
+              "displayName": "leave_balance",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": true,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        4240,
+        272
+      ],
+      "id": "d9e583d0-62dc-4fb1-a975-22cad93f1388",
+      "name": "Update Leave Balance"
+    },
+    {
+      "parameters": {
+        "fromEmail": "Zena <zxa220012@utdallas.edu>",
+        "toEmail": "={{ $('Prepare Final Record').item.json.employee_email }}",
+        "subject": "=Time-off request: {{ $('Prepare Final Record').item.json.status }}",
+        "html": "=<p>Hello {{ $('Prepare Final Record').item.json.employee_name }},</p><p>Your request for {{ $('Prepare Final Record').item.json.start_date }} through {{ $('Prepare Final Record').item.json.end_date }} is <strong>{{ $('Prepare Final Record').item.json.status }}</strong>.</p><p>{{ $('Prepare Final Record').item.json.decision_reason }}</p><p>Request ID: {{ $('Prepare Final Record').item.json.request_id }}</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        4464,
+        368
+      ],
+      "id": "3c01ea2e-9b0d-4b99-9114-86989143cea0",
+      "name": "Email Final Decision",
+      "webhookId": "bccf5587-fb31-489d-81b4-15e3deaf9ff4",
+      "credentials": {
+        "smtp": {
+          "id": "VpHGgWuXK2LlqL8v",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Setup required after import\n1. In every purple Data Table node, select the table named in **SELECT ...**.\n2. In every email node, select your SMTP credential and replace `hr@example.com`.\n3. Set this workflow's Error Workflow to **Time-Off Workflow Error Handler**.\n4. Test with sample employee `1003` before activating.\n\nNormal requests auto-approve only if notice, balance, and department-capacity rules pass. Emergencies wait for a manager/HR decision.",
+        "height": 300,
+        "width": 460,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7d600a0d-db9e-4ec7-9a39-23ed14c71e78",
+      "name": "Setup Notes"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "time-off-request",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        336
+      ],
+      "id": "315c2020-7340-4098-a379-0035773e15ce",
+      "name": "Webhook",
+      "webhookId": "0f6d6bed-f4bf-4a42-9e04-377ccbfe5556"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Time-Off Request Form": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare & Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Log Submitted Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Submitted Request": {
+      "main": [
+        [
+          {
+            "node": "Valid Input?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Input?": {
+      "main": [
+        [
+          {
+            "node": "Find Employee",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Invalid Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Employee": {
+      "main": [
+        [
+          {
+            "node": "Verify Employee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Employee": {
+      "main": [
+        [
+          {
+            "node": "Active Employee?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Active Employee?": {
+      "main": [
+        [
+          {
+            "node": "Find Same Requests",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set HR Review - Employee",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set HR Review - Employee": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Same Requests": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Duplicate Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Duplicate Request?": {
+      "main": [
+        [
+          {
+            "node": "Set Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Find Department",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Duplicate": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Department": {
+      "main": [
+        [
+          {
+            "node": "Find Department Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Department Requests": {
+      "main": [
+        [
+          {
+            "node": "Apply Policy Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Policy Rules": {
+      "main": [
+        [
+          {
+            "node": "Emergency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency?": {
+      "main": [
+        [
+          {
+            "node": "Emergency Approval Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Final Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Emergency Approval Email": {
+      "main": [
+        [
+          {
+            "node": "Record Human Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Human Decision": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Record": {
+      "main": [
+        [
+          {
+            "node": "Save Final Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Final Decision": {
+      "main": [
+        [
+          {
+            "node": "Deduct Balance?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deduct Balance?": {
+      "main": [
+        [
+          {
+            "node": "Update Leave Balance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email Final Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Leave Balance": {
+      "main": [
+        [
+          {
+            "node": "Email Final Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "27286b50-999b-4226-8251-e21235f29a89",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4c0d21c728998d7928cf31abec015e20588d4aee5d56ed2f594b97a932eee3b1"
+  },
+  "nodeGroups": [],
+  "id": "10axouYZYYypCr03",
+  "tags": []
+}
